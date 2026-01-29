@@ -32,11 +32,12 @@ waypoints = [
 path_line = LineString(waypoints)
 
 # Initialize in WGS84 and project to Finnish Metric System (EPSG:3067)
-path_gdf_metric = gpd.GeoDataFrame(
+path_gdf = gpd.GeoDataFrame(
     index=[0],
     crs="EPSG:4326",
     geometry=[path_line]
-).to_crs("EPSG:3067")
+)
+path_gdf_metric = path_gdf.to_crs("EPSG:3067")
 
 # Check the length of route
 route_length = path_gdf_metric.length[0]
