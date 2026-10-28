@@ -1,6 +1,52 @@
 import geopandas as gpd
 from shapely.geometry import LineString
 
+# ==================== ANALYSIS PARAMETERS ====================
+
+# Time window for satellite imagery analysis
+TIME_WINDOW = "2025-11-01/2026-05-31"
+
+# Satellite data parameters
+CLOUD_COVER_LIMIT = 20  # Maximum cloud cover percentage
+RESOLUTION_METERS = 10  # Spatial resolution in meters
+BUFFER_METERS = 20  # Buffer distance around route for analysis
+SAMPLING_STEP_METERS = 100  # Distance between sampling points along route
+
+# Ice detection thresholds
+# Tuned against full-season 2025-11/2026-05 pixel distributions (see analysis notes):
+# open water sits tightly around NDSI≈0 / NDWI≈0 with only a sparse high tail
+# (NDSI 99th pct ≈0.13, NDWI 1st pct ≈-0.11 on confirmed open-water scenes),
+# while confirmed full-ice scenes sit far past both thresholds (NDSI 10th pct ≈0.6,
+# NDWI 10th pct ≈-0.29). NDSI=0.15 sits at the best cut point in the narrow overlap
+# zone; NDWI tightened to -0.12 to shave off the open-water noise tail without
+# losing sensitivity on real ice.
+ICE_THRESHOLD_NDSI = 0.15  # NDSI threshold for ice detection (lowered for spring slush)
+ICE_THRESHOLD_NDWI = -0.12  # NDWI threshold for ice detection (water > 0, ice < 0)
+
+# Ice coverage status thresholds (percentages)
+STATUS_FROZEN_THRESHOLD = 50  # Above this = FROZEN
+STATUS_OPEN_THRESHOLD = 10  # Below this = OPEN, between = SLUSH
+
+# Cloud masking SCL (Scene Classification Layer) values to exclude
+# 3 = Cloud shadows, 8 = Cloud medium probability, 9 = Cloud high probability
+CLOUD_MASK_VALUES = [3, 8, 9]
+
+# SCL values that represent the actual surface being analyzed (water or snow/ice).
+# Restricting to these excludes land/vegetation pixels, whose NIR reflectance can
+# otherwise be misread as "black ice" by the NDWI threshold.
+# 6 = Water, 11 = Snow/Ice
+SURFACE_SCL_VALUES = [6, 11]
+
+# Sentinel-2 bands for analysis
+BANDS = {
+    'green': 'B03',  # Green band (560 nm) - 10m resolution
+    'nir': 'B08',    # Near-Infrared (842 nm) - 10m resolution
+    'swir': 'B11',   # SWIR (1610 nm) - 20m resolution (resampled to 10m)
+    'scl': 'SCL'     # Scene Classification Layer
+}
+
+# ==================== ROUTE GEOMETRY ====================
+
 # Waypoints from Point A to point B (Longitude, Latitude)
 waypoints = [
     # (Longitude, Latitude)
